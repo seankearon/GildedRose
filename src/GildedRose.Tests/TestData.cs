@@ -1,41 +1,25 @@
-using System.Collections;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using GildedRose.Console;
 
 namespace GildedRose.Tests
 {
-    public class TestData : IEnumerable<Item>
+    public static class TestData
     {
-        public TestData()
+        public static Item Item(Predicate<Item> condition)
         {
-            _program = new Program();
-
-
-            AgedBrie = _program.Items.Single(x => x.Name == "Aged Brie");
-            BackstagePasses = _program.Items.Single(x => x.Name.StartsWith("Backstage passes"));
-            Sulphuras = _program.Items.Single(x => x.Name.StartsWith("Sulfuras"));
+            return new Program().Items.Single(x => condition(x));
         }
 
-        private readonly Program _program;
-
-        public Item Item(Item item)
+        public static IEnumerable<Item> Where(Predicate<Item> condition)
         {
-            return _program.Items.Single(x => x.Name == item.Name);
+            return new Program().Items.Where(x => condition(x)).ToArray();
         }
 
-        public IEnumerator<Item> GetEnumerator()
+        public static IEnumerable<Item> Except(Predicate<Item> condition)
         {
-            return _program.Items.GetEnumerator();
+            return new Program().Items.Where(x => !condition(x));
         }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        public Item AgedBrie { get; set; }
-        private Item BackstagePasses { get; set; }
-        public Item Sulphuras { get; set; }
     }
 }

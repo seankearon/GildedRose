@@ -1,91 +1,15 @@
-// Content copyright © Atlantic Business Systems Ltd 2014.  All Rights Reserved.
-
 using System;
-using System.Linq;
-using GildedRose.Console;
 using NUnit.Framework;
 
 namespace GildedRose.Tests
 {
     [TestFixture]
-    public class InitialRequirement
+    public class InitialRequirements : TestBase
     {
-        public static void AgeItem(Item item)
-        {
-            var program = new Program();
-            program.Items.Clear();
-            program.Items.Add(item);
-            program.UpdateQuality();
-        }
-
-        bool ExpiryDay(Item item)
-        {
-            return item.SellIn == 0;
-        }
-
-        bool Expired(Item item)
-        {
-            return item.SellIn < 0;
-        }
-
-        private bool IsBackstagePass(Item item)
-        {
-            return item.Name == "Backstage passes to a TAFKAL80ETC concert";
-        }
-
-        private bool IsAgedBrie(Item item)
-        {
-            return item.Name == "Aged Brie";
-        }
-
-        private bool IsSulfuras(Item item)
-        {
-            return item.Name == "Sulfuras, Hand of Ragnaros";
-        }
-
-        private bool IsConjured(Item item)
-        {
-            return item.Name == "Conjured Mana Cake";
-        }
-
-        private bool QualityImprovesWithAge(Item item)
-        {
-            return IsAgedBrie(item) || IsBackstagePass(item);
-        }
-
-        private bool QualityReducesWithAge(Item item)
-        {
-            return DoesAge(item) && !QualityIsConstantWithAge(item) && !QualityImprovesWithAge(item);
-        }
-
-        private bool QualityIsConstantWithAge(Item item)
-        {
-            return IsSulfuras(item);
-        }
-
-        private bool DoesNotAge(Item item)
-        {
-            return IsSulfuras(item);
-        }
-
-        private bool DoesAge(Item item)
-        {
-            return !DoesNotAge(item);
-        }
-
-        private void RepeatUntil(Item item, Action<Item> action, Predicate<Item> condition)
-        {
-            do
-            {
-                action(item);
-            } while (!condition(item));
-        }
-
         [Test]
-        public void QualityDecrasesEveryDay()
+        public void QualityDecreasesEveryDay()
         {
-            var data = new TestData();
-            foreach (var item in data.Where(QualityReducesWithAge))
+            foreach (var item in TestData.Where(TheItem.QualityReducesWithAge))
             {
                 RepeatUntil(
                     item,
@@ -101,69 +25,66 @@ namespace GildedRose.Tests
 
         [TestCase(10, 6, 2)]
         [TestCase(5, 0, 3)]
-        public void BackstagePassesQualityIncreasesAtDifferentRatesCloserToTheConcert(int sellInRangeStart, int sellInRangeEnd, int expectedQualityIncrease)
+        public void BackstagePassesQualityIncreasesAtDifferentRates(int sellInRangeStart, int sellInRangeEnd, int expectedQualityIncrease)
         {
-            var backstagePasses = new TestData().Single(IsBackstagePass);
+            var backstagePasses = TestData.Item(TheItem.IsBackstagePass);
 
-            RepeatUntil(backstagePasses, AgeItem, x => x.SellIn == sellInRangeStart);
+            AgeUntil(backstagePasses, x => x.SellIn == sellInRangeStart);
             RepeatUntil(backstagePasses,
                 x =>
                 {
                     var initial = x.Quality;
                     AgeItem(x);
                     Assert.AreEqual(expectedQualityIncrease, x.Quality - initial);
-                }, 
+                },
                 x => x.SellIn == sellInRangeEnd);
         }
 
         [Test]
-        public void BackstagePassesQualityIsZeroAfterTheConcert()
+        public void BackstagePassesQualityIsZeroAfterExpiry()
         {
-            var backstagePasses = new TestData().Single(IsBackstagePass);
-            RepeatUntil(backstagePasses, AgeItem, Expired);
+            var backstagePasses = TestData.Item(TheItem.IsBackstagePass);
+            AgeUntil(backstagePasses, TheItem.HasExpired);
             Assert.AreEqual(0, backstagePasses.Quality);
         }
 
         [Test]
-        public void AfterExpiryQualityDegradesTwiceAsFast()
+        public void QualityDegradesTwiceAsFastAfterExpiry()
         {
-            var data = new TestData();
-            foreach (var item in data.Where(QualityReducesWithAge))
+            foreach (var item in TestData.Where(TheItem.QualityReducesWithAge))
             {
                 var initialReduction = AgeAndGetQualityReduction(item);
-                RepeatUntil(item, AgeItem, ExpiryDay);
+                AgeUntil(item, TheItem.IsOnExpiryDay);
                 var reductionAfterExpiry = AgeAndGetQualityReduction(item);
 
-                Assert.AreEqual(initialReduction * 2, reductionAfterExpiry, String.Format("item '{0}", item.Name));
+                Assert.AreEqual(initialReduction*2, reductionAfterExpiry, String.Format("item '{0}", item.Name));
             }
         }
 
         [Test]
-        public void ItemQualityIsNeverNegative()
+        public void QualityIsNeverNegative()
         {
-            var data = new TestData();
-            foreach (var item in data.Where(QualityReducesWithAge))
+            foreach (var item in TestData.Where(TheItem.QualityReducesWithAge))
             {
-                RepeatUntil(item, AgeItem, x => x.Quality == 0);
+                AgeUntil(item, x => x.Quality == 0);
                 Assert.That(item.Quality >= 0, String.Format("item '{0}", item.Name));
             }
         }
 
         [Test]
-        public void QualityIsNeverMoreThanFifty()
+        public void QualityNeverExceedsFifty()
         {
-            var data = new TestData();
-            foreach (var item in data.Except(new[] {data.Sulphuras}))
+            foreach (var item in TestData.Except(TheItem.IsSulfuras))
             {
-                RepeatUntil(item, AgeItem, x => x.SellIn == -500);
+                AgeUntil(item, x => x.SellIn == -500);
                 Assert.That(item.Quality <= 50, String.Format("item '{0}", item.Name));
             }
         }
 
         [Test]
-        public void AgedBrieIncreasesInQualityWithAge()
+        public void AgedBrieQualityIncreasesWithAge()
         {
-            var item = new TestData().AgedBrie;
+            var item = TestData.Item(TheItem.IsAgedBrie);
             RepeatUntil(
                 item,
                 x =>
@@ -176,39 +97,23 @@ namespace GildedRose.Tests
         }
 
         [Test]
-        public void SulphurasNeverDecreasesInQuality()
+        public void SulphurasQualityNeverReduces()
         {
-            var data = new TestData();
-            foreach (var item in data.Except(new[] {data.Sulphuras}))
-            {
-                RepeatUntil(item, AgeItem, x => x.SellIn == -500);
-                Assert.That(item.Quality <= 50, String.Format("item '{0}", item.Name));
-            }
+            var initial = TestData.Item(TheItem.IsSulfuras);
+            var aged = TestData.Item(TheItem.IsSulfuras);
+            AgeItem(aged);
+
+            Assert.AreEqual(initial.Quality, aged.Quality);
         }
 
-        private int AgeAndGetQualityReduction(Item item)
+        [Test]
+        public void SulphurasNeverExpires()
         {
-            var initial = item.Quality;
-            AgeItem(item);
-            return initial - item.Quality;
+            var initial = TestData.Item(TheItem.IsSulfuras);
+            var aged = TestData.Item(TheItem.IsSulfuras);
+            AgeItem(aged);
+
+            Assert.AreEqual(initial.SellIn, aged.SellIn);
         }
-    }
-
-    public class FutureRequirements
-    {
-        //[Test]
-        //public void ConjuredItemsDecreaseInQualityAtTwiceTheRate()
-        //{
-        //    var data = new TestData();
-
-        //    var normalItem = data.First(AgesNormally);
-        //    var normalReduction = AgeAndGetQualityReduction(normalItem); // Expect this to be 1, but it's never stated.
-
-        //    foreach (var conjured in data.Where(IsConjured))
-        //    {
-        //        var conjuredReduction = AgeAndGetQualityReduction(conjured);
-        //        Assert.AreEqual(normalReduction * 2, conjuredReduction, String.Format("item = '{0}'", conjured.Name));
-        //    }
-        //}
     }
 }
